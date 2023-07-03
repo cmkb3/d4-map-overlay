@@ -11,6 +11,72 @@ import win32gui
 import win32con
 import win32api
 import argparse
+import pyWinhook
+import threading
+import pythoncom
+
+global clear_overlay
+global update_overlay
+global should_exit
+global markers
+
+def on_key_down(event):
+	global clear_overlay
+	global update_overlay
+	global update_overlay
+	global markers
+	
+	# Handle key events as needed
+	if event.Key in ['m', 't', 'Escape']:
+		clear_overlay = True
+		if opt.debug == True:
+			print("Key '" + event.Key + "' pressed")
+		
+	if event.Key in ['F1']:
+		update_overlay = True
+		markers = markers_altar
+		if opt.debug == True:
+			print("Key '" + event.Key + "' pressed")
+	
+	if event.Key in ['F2']:
+		update_overlay = True
+		markers = markers_mysterious
+		if opt.debug == True:
+			print("Key '" + event.Key + "' pressed")
+	
+	if event.Key in ['F4']:
+		global should_exit
+		should_exit = True
+		if opt.debug == True:
+			print("Key '" + event.Key + "' pressed")
+		
+	return True  # Continue the hook
+
+def on_mouse_event(event):
+	global clear_overlay
+	clear_overlay = True
+	if opt.debug == True:
+		print("Mouse button pressed")
+
+	return True # Continue the hook
+
+# Thread function for pyWinhook event handling
+def pywinhook_thread_func(exit_flag):
+	hm = pyWinhook.HookManager()
+	
+	hm.KeyDown = on_key_down
+	hm.HookKeyboard()
+	
+	hm.MouseLeftDown = on_mouse_event
+	hm.HookMouse()
+
+	while not exit_flag.is_set():
+		pythoncom.PumpWaitingMessages()
+
+	hm.UnhookKeyboard()
+	hm.UnhookMouse()
+
+exit_flag = threading.Event()
 
 def resource_path(relative):
 	if hasattr(sys, "_MEIPASS") == True:
@@ -19,7 +85,7 @@ def resource_path(relative):
 			relative
 		)
 	else:
-	    return relative
+		return relative
 
 class MapCoords():
 	def __init__(self):
@@ -143,7 +209,9 @@ if __name__ == '__main__':
 	print("Diablo IV: Altar of Lilith Map Overlay")
 	print("======================================")
 	print("")
-	print("Press Q to exit...")
+	print("Press F1 for Altars of Lilith")
+	print("Press F2 for Mysterious Chests")
+	print("Press F4 to exit...")
 
 	if opt.use_large_map == True:
 		zoom = 6
@@ -157,7 +225,7 @@ if __name__ == '__main__':
 	map_image = cv2.resize(map_image, (0,0), fx = map_scale, fy = map_scale)
 
 	mc = MapCoords()
-	markers = []
+	markers_altar = []
 	with open(resource_path('data.json'), 'r') as f:
 		data = json.load(f)
 		jmarkers = data["markers"]
@@ -166,7 +234,18 @@ if __name__ == '__main__':
 				x, y = mc.latLngToPoint(m["coords"], zoom) # 5 = small map, 6 = large map ::: tiled map (saved from web) zoom level + 1
 				x /= (1 / map_scale)
 				y /= (1 / map_scale)
-				markers.append([x, y])
+				markers_altar.append([x, y])
+				
+	markers_mysterious = []
+	with open(resource_path('data.json'), 'r') as f:
+		data = json.load(f)
+		jmarkers = data["markers"]
+		for m in jmarkers:
+			if m["type"] == "Mysterious Chest":
+				x, y = mc.latLngToPoint(m["coords"], zoom) # 5 = small map, 6 = large map ::: tiled map (saved from web) zoom level + 1
+				x /= (1 / map_scale)
+				y /= (1 / map_scale)
+				markers_mysterious.append([x, y])
 
 	stm = MapSIFTMatcher(map_image)
 	pg.init()
@@ -175,6 +254,10 @@ if __name__ == '__main__':
 	screen_rect = screen.get_rect()
 	FPS = 1
 	clock = pg.time.Clock()
+
+	# Create and start the pyWinhook thread
+	pywinhook_thread = threading.Thread(target=pywinhook_thread_func, args=(exit_flag,))
+	pywinhook_thread.start()
 
 	transparency_color = (255, 0, 128)
 	hwnd = pg.display.get_wm_info()["window"]
@@ -190,33 +273,62 @@ if __name__ == '__main__':
 	sct = mss()
 	w, h = info.current_w, info.current_h
 	monitor = {'top': 0, 'left': 0, 'width': w, 'height': h}
+	
+	
 	running = True
-	while running:
-		start_ss = time.time()
-		screenshot = np.array(sct.grab(monitor))
-		screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
-		end_ss = time.time()
+	if opt.debug == True:
+		print("Run loop initiated...")
+		
+	update_overlay = False
+	clear_overlay = False
+	should_exit = False
+	
+	while running:		
+		if update_overlay:
+			if opt.debug == True:
+				print("update_overlay triggered")
+			start_ss = time.time()
+			screenshot = np.array(sct.grab(monitor))
+			screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
+			end_ss = time.time()
 
-		start_query = time.time()
-		debug_img, out_markers, num_matches = stm.query(screenshot, markers, MIN_MATCH_COUNT =  40, debug = opt.debug)
-		end_query = time.time()
-		if opt.debug == True:
-			print(f"Query: {end_query-start_query}s, Grab: {end_ss-start_ss}s, Num matches: {num_matches}")
+			start_query = time.time()
+			debug_img, out_markers, num_matches = stm.query(screenshot, markers, MIN_MATCH_COUNT =  40, debug = opt.debug)
+			end_query = time.time()
+			if opt.debug == True:
+				print(f"Query: {end_query-start_query}s, Grab: {end_ss-start_ss}s, Num matches: {num_matches}")
 
-		screen.fill((255, 0, 128))
-		pg.draw.circle(screen, '#00ff00', (10, 10), 5)
-		for m in out_markers:
-			pg.draw.circle(screen, '#ff00ff', (m[0] + monitor["left"], m[1] + monitor["top"]), 3)
+			screen.fill((255, 0, 128))
+			pg.draw.circle(screen, '#00ff00', (10, 10), 5)
+			for m in out_markers:
+				pg.draw.circle(screen, '#ff00ff', (m[0] + monitor["left"], m[1] + monitor["top"]), 3)
 
-		pg.display.flip()
-
+			pg.display.flip()
+			
+			update_overlay = False
+		
+		if clear_overlay:
+			if opt.debug == True:
+				print("clear_overlay triggered")
+			screen.fill((255, 0, 128))
+			pg.display.flip()
+			
+			clear_overlay = False
+		
+		if should_exit:
+			if opt.debug == True:
+				print("should_exit triggered")
+			running = False
+			exit_flag.set()
+			
+			should_exit = False
+	
 		clock.tick(FPS)
 
-		for event in pg.event.get():
-			if event.type == pg.QUIT:
-				running = False
-			elif event.type == pg.KEYDOWN and event.key == pg.K_q:
-				running = False
-
+	# Wait for the pyWinhook thread to complete
+	pywinhook_thread.join()
+	
+	if opt.debug == True:
+		print("exiting pygame")
+	
 	pg.quit()
-	cv2.destroyAllWindows()
