@@ -7,11 +7,15 @@
 ## How-to instructions
 
 Open terminal (win10/11), run: winget install Anaconda.Anaconda3
+
 After install open 'Anaconda Powershell Prompt'
+
 Navigate to this program's file directory, e.g.: CD C:\Downloads\d4-map-overlay\
 
 Run commands:
+
 python3 -m pip install -r requirements.txt
+
 python3 .\d4-altar-overlay.py
 
 When ingame, open the map, then press F1 to overlay altar of lilith locations or F2 to overlay mysterious chest locations.
