@@ -18,7 +18,7 @@ python3 -m pip install -r requirements.txt
 
 python3 .\d4-altar-overlay.py
 
-When ingame, open the map, then press F1 to overlay altar of lilith locations or F2 to overlay mysterious chest locations.
+When ingame, open the map, then press F1 to overlay altar of lilith locations, F2 to overlay mysterious chest locations, F3 to overlay waygate locations.
 Pressing M, T, or left mouse click will clear the overlay.
 
 Would like to eventually allow scrolling of the overlay along with the D4 map.
