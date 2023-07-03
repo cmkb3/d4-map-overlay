@@ -44,6 +44,12 @@ def on_key_down(event):
 		if opt.debug == True:
 			print("Key '" + event.Key + "' pressed")
 	
+	if event.Key in ['F3']:
+		update_overlay = True
+		markers = markers_waygate
+		if opt.debug == True:
+			print("Key '" + event.Key + "' pressed")
+	
 	if event.Key in ['F4']:
 		global should_exit
 		should_exit = True
@@ -211,6 +217,7 @@ if __name__ == '__main__':
 	print("")
 	print("Press F1 for Altars of Lilith")
 	print("Press F2 for Mysterious Chests")
+	print("Press F3 for Waygates")
 	print("Press F4 to exit...")
 
 	if opt.use_large_map == True:
@@ -225,7 +232,11 @@ if __name__ == '__main__':
 	map_image = cv2.resize(map_image, (0,0), fx = map_scale, fy = map_scale)
 
 	mc = MapCoords()
+	
 	markers_altar = []
+	markers_mysterious = []
+	markers_waygate = []
+	
 	with open(resource_path('data.json'), 'r') as f:
 		data = json.load(f)
 		jmarkers = data["markers"]
@@ -235,17 +246,16 @@ if __name__ == '__main__':
 				x /= (1 / map_scale)
 				y /= (1 / map_scale)
 				markers_altar.append([x, y])
-				
-	markers_mysterious = []
-	with open(resource_path('data.json'), 'r') as f:
-		data = json.load(f)
-		jmarkers = data["markers"]
-		for m in jmarkers:
 			if m["type"] == "Mysterious Chest":
 				x, y = mc.latLngToPoint(m["coords"], zoom) # 5 = small map, 6 = large map ::: tiled map (saved from web) zoom level + 1
 				x /= (1 / map_scale)
 				y /= (1 / map_scale)
 				markers_mysterious.append([x, y])
+			if m["type"] == "Waygate":
+				x, y = mc.latLngToPoint(m["coords"], zoom) # 5 = small map, 6 = large map ::: tiled map (saved from web) zoom level + 1
+				x /= (1 / map_scale)
+				y /= (1 / map_scale)
+				markers_waygate.append([x, y])
 
 	stm = MapSIFTMatcher(map_image)
 	pg.init()
